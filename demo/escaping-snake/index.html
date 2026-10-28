@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Snake vs Snack</title>
+<style>
+  :root {
+    --bg: #0b1020;
+    --panel: #111a2e;
+    --text: #e2e8f0;
+    --muted: #94a3b8;
+    --green: #22c55e;
+    --red: #ef4444;
+    --border: #243049;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: var(--bg); color: var(--text); }
+  body {
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 12px 12px 20px;
+    overflow-x: hidden;
+  }
+  .wrap { width: 100%; max-width: 672px; }
+  header {
+    display: flex; align-items: baseline; justify-content: space-between;
+    gap: 12px; flex-wrap: wrap; margin-bottom: 10px;
+  }
+  h1 { font-size: 22px; margin: 0; letter-spacing: 0.5px; }
+  h1 span { color: var(--red); }
+  .hint { color: var(--muted); font-size: 13px; }
+  .controls {
+    display: flex; gap: 8px; flex-wrap: wrap; align-items: center;
+    margin-bottom: 10px;
+  }
+  .modes { display: inline-flex; border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+  .modes button {
+    background: var(--panel); color: var(--muted); border: 0;
+    padding: 10px 16px; font-size: 15px; cursor: pointer;
+  }
+  .modes button.active { background: var(--green); color: #052e16; font-weight: 700; }
+  .modes button + button { border-left: 1px solid var(--border); }
+  #restart {
+    background: var(--panel); color: var(--text); border: 1px solid var(--border);
+    border-radius: 10px; padding: 10px 16px; font-size: 15px; cursor: pointer;
+  }
+  #restart:hover, .modes button:hover { filter: brightness(1.15); }
+  #status { color: var(--muted); font-size: 14px; margin: 0 0 8px; min-height: 1.3em; }
+  #status strong { color: var(--text); }
+  #playfield { width: 100%; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; background: #0f172a; }
+  #playfield canvas { display: block; width: 100%; height: auto; }
+  footer { margin-top: 12px; color: var(--muted); font-size: 12px; }
+  footer a { color: var(--muted); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Snake <span>vs</span> Snack</h1>
+    <div class="hint">Ok tuşları veya WASD · bir yön tuşuna basınca başlar</div>
+  </header>
+
+  <div class="controls">
+    <div class="modes" role="group" aria-label="Oyun modu">
+      <button type="button" id="mode-classic" data-mode="classic">Klasik</button>
+      <button type="button" id="mode-escaping" data-mode="escaping">Kaçan Yem</button>
+    </div>
+    <button type="button" id="restart">Yeniden Başlat</button>
+  </div>
+
+  <p id="status"></p>
+
+  <div id="playfield"></div>
+
+  <footer>
+    Temel oyun: <a href="https://github.com/betamos/Snake-JS">Snake-JS</a>, Didrik Nordström, MIT lisansı.
+    Kaçan yem modu bu demo için eklendi.
+  </footer>
+</div>
+
+<script src="snake-js.js"></script>
+<script>
+(function(){
+  var MODE_TEXT = {
+    classic:  "<strong>Klasik</strong> — yem yerinde durur.",
+    escaping: "<strong>Kaçan Yem</strong> — yılan 4 hücreden yakına gelince yem kaçar (en fazla 3 harekette 1 adım)."
+  };
+
+  var playfield = document.getElementById("playfield");
+  var status = document.getElementById("status");
+  var modeButtons = document.querySelectorAll(".modes button");
+  var game = null;
+  var currentMode = "classic";
+
+  function configFor(mode) {
+    return {
+      gridWidth : 24,
+      gridHeight : 18,
+      pointSize : 28,
+      frameInterval : 130,
+      backgroundColor : "#0f172a",
+      gridLineColor : "rgba(255,255,255,0.05)",
+      snakeColor : "#22c55e",
+      snakeEyeColor : "#052e16",
+      candyColor : "#ef4444",
+      shrinkingCandyColor : "#f97316",
+      scoreBoardColor : "#1e293b",
+      scoreTextColor : "#e2e8f0",
+      scoreBoardHeight : 36,
+      scoreLabel : "SKOR",
+      highScoreLabel : "REKOR",
+      winMessage : "KAZANDIN!",
+      collisionTolerance : 1,
+      initialLength : 5,        // the snake starts with 5 cells
+      growthPerCandy : 1,       // and grows by 1 cell per candy
+
+      // Escaping candy settings (tunable)
+      escapingCandy : mode === "escaping",
+      escapeDistance : 4,       // flee while Manhattan distance < 4
+      escapeEveryNMoves : 3     // at most one 1-cell step per 3 snake moves
+    };
+  }
+
+  function startGame(mode) {
+    if (game) {
+      game.destroy();   // stops the interval, pending timeouts and key listeners, removes the canvas
+      game = null;
+    }
+    currentMode = mode;
+    document.body.setAttribute("data-mode", mode);
+    for (var i = 0; i < modeButtons.length; i++)
+      modeButtons[i].classList.toggle("active", modeButtons[i].getAttribute("data-mode") === mode);
+    status.innerHTML = MODE_TEXT[mode];
+    game = new SnakeJS(playfield, configFor(mode));
+    window.game = game;   // handy for debugging and tests
+  }
+
+  for (var i = 0; i < modeButtons.length; i++) {
+    modeButtons[i].addEventListener("click", function(){
+      startGame(this.getAttribute("data-mode"));
+      this.blur();
+    });
+  }
+  document.getElementById("restart").addEventListener("click", function(){
+    startGame(currentMode);
+    this.blur();
+  });
+
+  // Keep the page still while playing (space / arrows must never scroll)
+  window.addEventListener("keydown", function(e){
+    if (e.key === " " || e.key === "Spacebar") e.preventDefault();
+  });
+
+  window.startGame = startGame;
+  startGame("classic");
+})();
+</script>
+</body>
+</html>
