@@ -52,6 +52,13 @@ the upstream work. Everything below was added for the snake-vs-snack demo.
 ### Input
 - Arrow keys and WASD, resolved by `event.key` with `keyCode` fallback;
   modifier combinations are ignored; `preventDefault` keeps the page still.
+- New `steer("up"|"down"|"left"|"right")` on `SnakeJS` (via
+  `InputInterface.setDirection`) so the page can drive the snake from touch.
+- `index.html`: swipe gestures on the play field (pointer events, 20 px
+  threshold, re-armed after each turn so one finger can chain turns) and an
+  on-screen D-pad shown on coarse-pointer devices or after the first touch.
+  `touch-action: none` on the play field and pad keeps swipes from scrolling
+  or zooming the page. Verified in `tests/verify.js` on an emulated phone.
 
 ### View
 - Scared candy gets two eyes with pupils looking away from the snake.

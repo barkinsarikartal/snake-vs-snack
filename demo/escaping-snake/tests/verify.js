@@ -285,6 +285,55 @@ function analyseFrames(frames, mode) {
   await page.screenshot({ path: OUT + '/05-win-state.png' });
 
   check('no page errors or console errors', errors.length === 0, errors.slice(0, 3).join(' | '));
+
+  // ---- Touch controls on a phone-sized touch device
+  const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true, deviceScaleFactor: 2 });
+  const mp = await ctx.newPage();
+  const mErrors = [];
+  mp.on('pageerror', e => mErrors.push('pageerror: ' + e.message));
+  await mp.goto(PAGE);
+  const cdp = await ctx.newCDPSession(mp);
+  const swipe = async (x1, y1, x2, y2) => {
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: x1, y: y1 }] });
+    const steps = 6;
+    for (let i = 1; i <= steps; i++)
+      await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: x1 + (x2 - x1) * i / steps, y: y1 + (y2 - y1) * i / steps }] });
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  };
+  const mLayout = await mp.evaluate(() => {
+    const pad = document.getElementById('dpad'), c = document.querySelector('#playfield canvas').getBoundingClientRect();
+    return { padDisplay: getComputedStyle(pad).display, padVisible: pad.getBoundingClientRect().height > 0,
+             canvas: { x: c.x, y: c.y, w: c.width, h: c.height }, docH: document.documentElement.scrollHeight, innerH: window.innerHeight,
+             scrollW: document.documentElement.scrollWidth, innerW: window.innerWidth };
+  });
+  check('mobile: on-screen D-pad visible on a touch device', mLayout.padDisplay === 'grid' && mLayout.padVisible, JSON.stringify(mLayout));
+  check('mobile: canvas and D-pad fit in a 390x844 portrait screen without scrolling', mLayout.docH <= mLayout.innerH && mLayout.scrollW <= mLayout.innerW, `docH=${mLayout.docH} innerH=${mLayout.innerH}`);
+  const c = mLayout.canvas, cx = c.x + c.w / 2, cy = c.y + c.h / 2;
+  // swipe down on the play field: game should start (READY -> PLAYING) heading down
+  await swipe(cx, cy - 40, cx, cy + 60);
+  await sleep(400);
+  let ms = await mp.evaluate(() => window.game.getState());
+  check('mobile: swipe down starts the game and steers down', ms.state === STATE.PLAYING && ms.direction === -1, JSON.stringify({ state: ms.state, direction: ms.direction }));
+  // swipe right -> direction right (2)
+  await swipe(cx - 60, cy, cx + 60, cy);
+  await sleep(300);
+  ms = await mp.evaluate(() => window.game.getState());
+  check('mobile: swipe right steers right', ms.direction === 2, `direction=${ms.direction}`);
+  // D-pad "up" tap
+  const upBox = await mp.locator('#dpad .up').boundingBox();
+  await mp.touchscreen.tap(upBox.x + upBox.width / 2, upBox.y + upBox.height / 2);
+  await sleep(300);
+  ms = await mp.evaluate(() => window.game.getState());
+  check('mobile: D-pad tap steers up', ms.direction === 1, `direction=${ms.direction}`);
+  // swipes must not scroll the page
+  await swipe(cx, cy + 60, cx, cy - 60);
+  await sleep(200);
+  const mScroll = await mp.evaluate(() => window.scrollY);
+  check('mobile: swiping on the play field does not scroll the page', mScroll === 0, `scrollY=${mScroll}`);
+  await mp.evaluate(() => window.game.pause());
+  await mp.screenshot({ path: OUT + '/08-mobile-portrait.png' });
+  check('mobile: no page errors', mErrors.length === 0, mErrors.join(' | '));
+  await ctx.close();
   await browser.close();
 
   const failed = results.filter(r => !r.ok).length;

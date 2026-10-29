@@ -108,6 +108,12 @@ function SnakeJS(parentElement, config){
 		return engine.getState();
 	};
 
+	// Steer the snake from code (touch controls, on-screen buttons).
+	// direction is "up", "down", "left" or "right". Starts the game when READY.
+	this.steer = function(direction){
+		engine.steer(direction);
+	};
+
 	/**
 	 * GAME MODEL OBJECT
 	 *
@@ -155,6 +161,17 @@ function SnakeJS(parentElement, config){
 
 		this.getScore = function(){
 			return score;
+		};
+
+		this.steer = function(direction){
+			var map = {
+				up : constants.DIRECTION_UP,
+				right : constants.DIRECTION_RIGHT,
+				down : constants.DIRECTION_DOWN,
+				left : constants.DIRECTION_LEFT
+			};
+			if (inputInterface && map.hasOwnProperty(direction))
+				inputInterface.setDirection(map[direction]);
 		};
 
 		this.destroy = function(){
@@ -1051,6 +1068,13 @@ function SnakeJS(parentElement, config){
 
 		this.lastDirection = function(){
 			return lastDirection;
+		};
+
+		// Set the direction from outside (touch/swipe/on-screen buttons).
+		// Behaves like an arrow key press, including auto play.
+		this.setDirection = function(direction){
+			lastDirection = direction;
+			autoPlayFn();
 		};
 
 		// Start listening for player events
