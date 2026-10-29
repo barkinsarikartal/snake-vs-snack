@@ -168,10 +168,13 @@ function analyseFrames(frames, mode) {
     canvases: document.querySelectorAll('canvas').length, mode: document.body.getAttribute('data-mode')
   }));
   check('page fits a 420px-wide window without horizontal scroll', layout.scrollWidth <= layout.innerWidth, JSON.stringify(layout));
-  check('one canvas, classic mode on load', layout.canvases === 1 && layout.mode === 'classic');
-  await page.screenshot({ path: OUT + '/01-classic-start-narrow.png' });
+  check('one canvas, escaping mode on load', layout.canvases === 1 && layout.mode === 'escaping');
+  await page.screenshot({ path: OUT + '/01-escaping-start-narrow.png' });
 
-  // ---- Classic mode: bot plays 12 s
+  // ---- Classic mode: switch to it, bot plays 12 s
+  await page.click('#mode-classic');
+  await sleep(200);
+  check('classic button switches to classic mode', await page.evaluate(() => document.body.getAttribute('data-mode') === 'classic' && window.game.getState().mode === 'classic'));
   await page.evaluate(() => { window.__frames.length = 0; window.__bot.enabled = true; });
   await sleep(12000);
   await page.evaluate(() => { window.__bot.enabled = false; });
